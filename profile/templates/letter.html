@@ -1,0 +1,20 @@
+<html><head><meta charset="utf-8"><style>@page { size: A4; margin: 20mm 20mm; }</style></head>
+<body style="font-family:Inter,Arial,sans-serif;font-size:10.5pt;color:#111111;line-height:1.35">
+<!-- TEMPLATE for /draft (PDF via Edge headless): cover letter. Same header as cv.html so the two PDFs match.
+     Fill: {{DATE}} (e.g. "Munich, 12 October 2026"; Italian: "Monaco di Baviera, 12 ottobre 2026"),
+     {{RECIPIENT}} (firm, team, city; one <br> per line), {{SALUTATION}}, {{BODY}} (one <p> per
+     paragraph, same inline style), {{CLOSING}} ("Best regards," / "Cordiali saluti," …). -->
+
+<p style="text-align:center;font-size:22pt;margin:0 0 4pt 0">Gianluigi Graziano Alessandro Sottile</p>
+<p style="text-align:center;font-size:9.5pt;margin:0 0 4pt 0">Munich, Germany · {{EMAIL}} · {{PHONE}} · <a href="https://www.linkedin.com/in/gianluigi-sottile-44b852148/" style="color:#7a1f12">LinkedIn</a></p>
+<p style="margin:0 0 14pt 0;border-bottom:0.75pt solid #9a9a9a"> </p>
+
+<p style="text-align:right;margin:0 0 12pt 0">{{DATE}}</p>
+<p style="margin:0 0 12pt 0"><b>{{RECIPIENT}}</b></p>
+<p style="margin:0 0 10pt 0">{{SALUTATION}}</p>
+
+<p style="text-align:justify;margin:0 0 8pt 0">{{BODY — one paragraph per <p>, this style}}</p>
+
+<p style="margin:12pt 0 2pt 0">{{CLOSING}}</p>
+<p style="margin:0;font-weight:bold">Gianluigi Sottile</p>
+</body></html>

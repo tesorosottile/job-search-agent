@@ -1,0 +1,635 @@
+<title>Job Quest Board</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a game HUD on top (player, XP, run stats), filter tabs, then the quest list grouped by
+   grade; each quest opens a trading-card style detail sheet. Panels use hard offset shadows. */
+:root {
+  --bg: #e9edf6;          /* cool paper, slight cobalt bias */
+  --panel: #ffffff;
+  --panel-2: #f3f5fb;
+  --ink: #141a33;
+  --muted: #5a6385;
+  --line: #c9d0e4;
+  --accent: #2f4bff;      /* cobalt: interactive */
+  --accent-ink: #ffffff;
+  --xp: #ffb020;          /* gold: XP and rewards */
+  --high: #12a463;
+  --mid: #e0a800;
+  --risk: #e23d4b;
+  --shadow: #141a33;
+  --display: "Chakra Petch", "Bahnschrift", "Arial Narrow", system-ui, sans-serif;
+  --body: "Figtree", "Segoe UI", system-ui, sans-serif;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1326; --panel: #171f3a; --panel-2: #1d2747; --ink: #e9edfa; --muted: #9aa5c9;
+    --line: #2d3a66; --accent: #8193ff; --accent-ink: #0e1326; --xp: #ffc24d;
+    --high: #2fd18a; --mid: #f5c935; --risk: #ff6b77; --shadow: #050814; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1326; --panel: #171f3a; --panel-2: #1d2747; --ink: #e9edfa; --muted: #9aa5c9;
+  --line: #2d3a66; --accent: #8193ff; --accent-ink: #0e1326; --xp: #ffc24d;
+  --high: #2fd18a; --mid: #f5c935; --risk: #ff6b77; --shadow: #050814; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  background-image: radial-gradient(var(--line) 1px, transparent 1px);
+  background-size: 22px 22px;
+  color: var(--ink);
+  font: 15px/1.5 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 64px;
+}
+.wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 18px; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.panel { background: var(--panel); border: 2px solid var(--ink); border-radius: var(--r); box-shadow: 4px 4px 0 var(--shadow); }
+.label { font: 600 11px/1 var(--display); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; }
+
+/* ---------- HUD ---------- */
+.hud { display: grid; grid-template-columns: auto 1fr auto; gap: 18px; align-items: center; padding: 16px 18px; }
+.avatar {
+  width: 58px; height: 64px; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink);
+  font: 700 22px var(--display); clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+}
+.player { min-width: 0; display: grid; gap: 6px; }
+.player h1 { font-size: 22px; line-height: 1.1; }
+.rank { font: 600 13px var(--display); color: var(--accent); letter-spacing: .04em; }
+.xpbar { height: 12px; border: 2px solid var(--ink); border-radius: 99px; background: var(--panel-2); overflow: hidden; }
+.xpbar span { display: block; height: 100%; width: 0; background: repeating-linear-gradient(-45deg, var(--xp) 0 8px, color-mix(in srgb, var(--xp) 78%, #fff) 8px 16px); transition: width .6s cubic-bezier(.2,.9,.3,1.2); }
+.xpline { display: flex; justify-content: space-between; gap: 8px; font: 500 12px var(--display); color: var(--muted); font-variant-numeric: tabular-nums; }
+.stats { display: grid; grid-template-columns: repeat(3, auto); gap: 6px 18px; text-align: right; }
+.stat b { display: block; font: 700 22px/1 var(--display); font-variant-numeric: tabular-nums; }
+.badges { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
+.badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px; border: 1.5px dashed var(--line); font: 600 12px var(--display); color: var(--muted); }
+.badge.on { border-style: solid; border-color: var(--xp); color: var(--ink); background: color-mix(in srgb, var(--xp) 18%, transparent); }
+.badge i { font-style: normal; }
+
+/* ---------- Tabs ---------- */
+.bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.tab { border: 2px solid var(--ink); background: var(--panel); border-radius: 99px; padding: 6px 14px; font: 600 13px var(--display); letter-spacing: .03em; box-shadow: 2px 2px 0 var(--shadow); transition: transform .12s; }
+.tab:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--shadow); }
+.tab[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.tab .n { opacity: .65; margin-left: 4px; font-variant-numeric: tabular-nums; }
+.legend { display: flex; gap: 14px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+.legend span { display: inline-flex; gap: 6px; align-items: center; }
+
+/* ---------- Gems ---------- */
+.gem { width: 14px; height: 14px; flex: none; transform: rotate(45deg); border-radius: 3px; border: 2px solid var(--ink); }
+.gem.high { background: var(--high); }
+.gem.medium { background: var(--mid); }
+.gem.risky { background: var(--risk); }
+
+/* ---------- Board ---------- */
+.group { display: grid; gap: 10px; }
+.group-head { display: flex; align-items: center; gap: 10px; padding-left: 4px; }
+.group-head h2 { font-size: 15px; letter-spacing: .08em; text-transform: uppercase; }
+.group-head .count { font: 600 13px var(--display); color: var(--muted); }
+.rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.row {
+  width: 100%; text-align: left; display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 14px; align-items: center;
+  padding: 14px 16px; background: var(--panel); border: 2px solid var(--ink); border-radius: var(--r);
+  box-shadow: 3px 3px 0 var(--shadow); transition: transform .15s ease, box-shadow .15s ease;
+}
+.intro .row { animation: rise .45s cubic-bezier(.2,.9,.3,1.15) both; animation-delay: calc(var(--i, 0) * 35ms); }
+.row:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--shadow); }
+.row:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--shadow); }
+.row.done { background: var(--panel-2); }
+@keyframes rise { from { transform: translateY(10px) scale(.985); } to { transform: none; } }
+.rmain { min-width: 0; display: grid; gap: 6px; }
+.rtitle { font: 600 16px/1.25 var(--body); overflow-wrap: anywhere; }
+.rcompany { color: var(--muted); font-weight: 500; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 500 12px/1 var(--body); padding: 4px 8px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--line); white-space: nowrap; }
+.chip.warn { border-color: var(--risk); color: var(--risk); }
+.chip.ex { background: var(--xp); color: #141a33; border-color: var(--ink); font-weight: 700; }
+.chip.ok { border-color: var(--high); }
+.power { display: grid; gap: 4px; justify-items: end; }
+.pips { display: grid; grid-template-columns: repeat(10, 5px); gap: 2px; }
+.pips i { height: 14px; border-radius: 1px; background: var(--line); }
+.pips i.on { background: var(--accent); }
+.power .label { font-size: 10px; }
+.myscore { width: 46px; height: 46px; display: grid; place-items: center; border-radius: 50%; border: 2px dashed var(--line); font: 700 18px var(--display); color: var(--muted); font-variant-numeric: tabular-nums; }
+.myscore.set { border: 2px solid var(--ink); background: var(--xp); color: #141a33; }
+
+.empty { padding: 34px 24px; text-align: center; display: grid; gap: 10px; justify-items: center; }
+.empty h2 { font-size: 20px; }
+.empty p { margin: 0; color: var(--muted); max-width: 46ch; }
+.empty code, .card code { font: 600 13px var(--display); background: var(--panel-2); border: 1px solid var(--line); padding: 2px 6px; border-radius: 5px; }
+.note { font-size: 13px; color: var(--muted); text-align: center; }
+
+/* ---------- Card ---------- */
+dialog.card { padding: 0; border: 2px solid var(--ink); border-radius: 14px; background: var(--panel); color: var(--ink); box-shadow: 8px 8px 0 var(--shadow); width: min(720px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); overflow: auto; }
+dialog.card[open] { animation: deal .38s cubic-bezier(.2,.9,.3,1.2); }
+dialog.card::backdrop { background: color-mix(in srgb, var(--shadow) 55%, transparent); backdrop-filter: blur(2px); }
+@keyframes deal { from { transform: translateY(24px) rotate(-1.5deg) scale(.96); } to { transform: none; } }
+.ribbon { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 18px; border-bottom: 2px solid var(--ink); font: 700 13px var(--display); letter-spacing: .1em; text-transform: uppercase; position: sticky; top: 0; z-index: 2; }
+.ribbon.high { background: var(--high); color: #07150f; }
+.ribbon.medium { background: var(--mid); color: #1d1600; }
+.ribbon.risky { background: var(--risk); color: #fff; }
+.ribbon .close { border: 2px solid currentColor; background: transparent; border-radius: 8px; width: 32px; height: 32px; font-size: 18px; line-height: 1; display: grid; place-items: center; }
+.cbody { padding: 18px; display: grid; gap: 18px; }
+.chead { display: grid; gap: 8px; }
+.chead h2 { font-size: 24px; line-height: 1.15; }
+.chead .rcompany { font-size: 16px; }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.tile { border: 2px solid var(--ink); border-radius: var(--r); padding: 12px 14px; background: var(--panel-2); display: grid; gap: 4px; align-content: start; min-width: 0; }
+.tile b { font: 700 20px/1.2 var(--display); overflow-wrap: anywhere; }
+.tag { justify-self: start; font: 700 10px/1 var(--display); letter-spacing: .1em; text-transform: uppercase; padding: 3px 6px; border-radius: 4px; border: 1.5px solid var(--ink); }
+.tag.stated { background: var(--high); color: #07150f; }
+.tag.estimate { background: transparent; color: var(--ink); border-style: dashed; }
+.tile small { color: var(--muted); font-size: 12px; }
+.sec { display: grid; gap: 8px; }
+.sec h3 { font-size: 14px; letter-spacing: .1em; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+.sec h3::before { content: ""; width: 8px; height: 8px; background: var(--accent); transform: rotate(45deg); }
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.checks li { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 8px; align-items: start; }
+.mark { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font: 700 13px var(--display); border: 2px solid var(--ink); }
+.mark.yes { background: var(--high); color: #07150f; }
+.mark.partial { background: var(--mid); color: #1d1600; }
+.mark.no { background: var(--risk); color: #fff; }
+.mark.na { background: var(--panel-2); color: var(--muted); border-color: var(--line); }
+.ev { display: inline-flex; gap: 4px; flex-wrap: wrap; margin-left: 4px; vertical-align: 1px; }
+.ev span { font: 700 11px/1 var(--display); padding: 3px 5px; border-radius: 4px; background: var(--accent); color: var(--accent-ink); }
+.flags { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.verdict { border: 2px dashed var(--line); border-radius: var(--r); padding: 14px; display: grid; gap: 12px; }
+.scorepad { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 6px; }
+.scorepad button { aspect-ratio: 1; max-height: 44px; border: 2px solid var(--ink); border-radius: 8px; background: var(--panel); font: 700 16px var(--display); box-shadow: 2px 2px 0 var(--shadow); transition: transform .1s, background .15s; position: relative; }
+.scorepad button:hover { transform: translateY(-2px); }
+.scorepad button.fill { background: color-mix(in srgb, var(--xp) 45%, var(--panel)); }
+.scorepad button[aria-pressed="true"] { background: var(--xp); color: #141a33; transform: translateY(-2px); }
+.scale { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+textarea { width: 100%; min-height: 72px; resize: vertical; font: 15px/1.45 var(--body); color: var(--ink); background: var(--panel); border: 2px solid var(--ink); border-radius: 8px; padding: 10px; }
+.status { display: flex; flex-wrap: wrap; gap: 8px; }
+.status button { border: 2px solid var(--ink); background: var(--panel); border-radius: 99px; padding: 5px 12px; font: 600 13px var(--display); }
+.status button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.saved { font-size: 12px; color: var(--muted); min-height: 1em; }
+.cfoot { border-top: 2px solid var(--ink); padding: 14px 18px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; background: var(--panel-2); }
+.go { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 10px; border: 2px solid var(--ink); background: var(--accent); color: var(--accent-ink); font: 700 14px var(--display); letter-spacing: .04em; text-decoration: none; box-shadow: 3px 3px 0 var(--shadow); }
+.go:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--shadow); }
+.copy { border: 2px solid var(--ink); background: var(--panel); border-radius: 10px; padding: 9px 12px; font: 600 13px var(--display); }
+.route { font-size: 13px; color: var(--muted); }
+
+/* ---------- Rewards ---------- */
+.toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); font: 700 15px var(--display); padding: 10px 18px; border-radius: 99px; box-shadow: 3px 3px 0 var(--xp); z-index: 50; pointer-events: none; animation: pop 1.6s ease forwards; }
+@keyframes pop { 0% { transform: translate(-50%, 20px) scale(.9); opacity: 0; } 12% { transform: translate(-50%, 0) scale(1.05); opacity: 1; } 80% { opacity: 1; } 100% { transform: translate(-50%, -14px); opacity: 0; } }
+.spark { position: fixed; width: 8px; height: 8px; z-index: 60; pointer-events: none; border-radius: 2px; animation: fly .7s cubic-bezier(.1,.8,.3,1) forwards; }
+@keyframes fly { to { transform: translate(var(--dx), var(--dy)) rotate(220deg); opacity: 0; } }
+.levelup { position: fixed; inset: 0; display: grid; place-items: center; z-index: 70; pointer-events: none; }
+.levelup div { background: var(--xp); color: #141a33; border: 3px solid var(--ink); box-shadow: 6px 6px 0 var(--shadow); border-radius: 14px; padding: 18px 28px; text-align: center; font: 700 26px var(--display); animation: lvl 2.2s ease forwards; }
+.levelup small { display: block; font: 600 14px var(--body); }
+@keyframes lvl { 0% { transform: scale(.6) rotate(-4deg); opacity: 0; } 15% { transform: scale(1.06) rotate(1deg); opacity: 1; } 80% { opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
+
+@media (max-width: 700px) {
+  .hud { grid-template-columns: auto 1fr; }
+  .stats { grid-column: 1 / -1; grid-template-columns: repeat(3, 1fr); text-align: left; }
+  .row { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .row .power { display: none; }
+  .tiles { grid-template-columns: 1fr; }
+  dialog.card { width: 100vw; max-width: 100vw; margin: auto 0 0; border-radius: 16px 16px 0 0; max-height: 92dvh; }
+  dialog.card[open] { animation-name: sheet; }
+  @keyframes sheet { from { transform: translateY(40%); } to { transform: none; } }
+  .scorepad { gap: 4px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+
+<div class="wrap">
+  <section class="panel hud" aria-label="Your progress">
+    <div class="avatar" aria-hidden="true">GS</div>
+    <div class="player">
+      <h1>Gianluigi's job quest</h1>
+      <div class="rank" id="rank">Level 1 · Scout</div>
+      <div class="xpbar" role="progressbar" aria-label="XP to next level" aria-valuemin="0" aria-valuemax="100" id="xpbar"><span id="xpfill"></span></div>
+      <div class="xpline"><span id="xptext">0 XP</span><span id="xpnext">100 XP to Pathfinder</span></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><span class="label">Rated</span><b id="sRated">0/0</b></div>
+      <div class="stat"><span class="label">Applied</span><b id="sApplied">0</b></div>
+      <div class="stat"><span class="label">Last hunt</span><b id="sRun">—</b></div>
+    </div>
+    <div class="badges" id="badges" aria-label="Achievements"></div>
+  </section>
+
+  <div class="bar">
+    <div class="tabs" role="group" aria-label="Filter quests" id="tabs"></div>
+    <div class="legend" aria-label="Fit legend">
+      <span><i class="gem high"></i>High fit</span>
+      <span><i class="gem medium"></i>Medium fit</span>
+      <span><i class="gem risky"></i>Risky</span>
+    </div>
+  </div>
+
+  <main id="board" aria-live="polite">
+    <div class="panel empty" id="loading">
+      <h2>Loading your board…</h2>
+      <p>Postings found by <code>/find-jobs</code> appear here, best fit first.</p>
+    </div>
+  </main>
+  <p class="note" id="hunt"></p>
+</div>
+
+<dialog class="card" id="card" aria-labelledby="cardTitle"></dialog>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const el = (tag, attrs = {}, ...kids) => {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v == null || v === false) continue;
+      if (k === "class") n.className = v;
+      else if (k === "text") n.textContent = v;
+      else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+      else n.setAttribute(k, v === true ? "" : v);
+    }
+    for (const kid of kids.flat()) if (kid != null && kid !== false) n.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+    return n;
+  };
+  const str = (v) => (typeof v === "string" ? v : v == null ? "" : String(v));
+  const arr = (v) => (Array.isArray(v) ? v : []);
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const GRADES = { high: { rank: 0, name: "High fit" }, medium: { rank: 1, name: "Medium fit" }, risky: { rank: 2, name: "Risky" } };
+  const LEVELS = [
+    [0, "Scout"], [100, "Pathfinder"], [250, "Ranger"], [450, "Strategist"], [700, "Rainmaker"], [1000, "Legend"]
+  ];
+  const STATUSES = [["", "Not yet"], ["applied", "Applied"], ["interview", "Interview"], ["rejected", "Rejected"], ["passed", "Passed on it"]];
+  const FILTERS = [["all", "All"], ["rate", "To rate"], ["high", "High"], ["medium", "Medium"], ["risky", "Risky"], ["applied", "Applied"]];
+
+  const state = { postings: new Map(), scores: new Map(), meta: null, filter: "all", openId: null, loaded: false };
+  const local = new Map();        // his edits, merged over the stored scores
+  const writers = new Map();      // one write at a time per scores doc
+  let db = null, introDone = false;
+
+  try { const f = localStorage.getItem("qb.filter"); if (f && FILTERS.some(([k]) => k === f)) state.filter = f; } catch (e) {}
+
+  function gradeOf(p) {
+    if (GRADES[p.grade]) return p.grade;
+    const f = Number(p.fit) || 0;
+    return f >= 8 ? "high" : f >= 6 ? "medium" : "risky";
+  }
+  const mine = (id) => local.get(id) || state.scores.get(id) || {};
+  const isApplied = (s) => s.status === "applied" || s.status === "interview";
+
+  function sorted() {
+    return [...state.postings.values()].sort((a, b) =>
+      GRADES[gradeOf(a)].rank - GRADES[gradeOf(b)].rank || (Number(b.fit) || 0) - (Number(a.fit) || 0) || (Number(a.num) || 0) - (Number(b.num) || 0));
+  }
+  function passes(p) {
+    const s = mine(p.id);
+    switch (state.filter) {
+      case "rate": return !s.score;
+      case "high": case "medium": case "risky": return gradeOf(p) === state.filter;
+      case "applied": return isApplied(s);
+      default: return true;
+    }
+  }
+
+  /* ---------- XP ---------- */
+  function progress() {
+    let xp = 0, rated = 0, noted = 0, applied = 0, interviews = 0;
+    for (const p of state.postings.values()) {
+      const s = mine(p.id);
+      if (s.score) { xp += 10; rated++; }
+      if (str(s.notes).trim()) { xp += 5; noted++; }
+      if (isApplied(s)) { xp += 50; applied++; }
+      if (s.status === "interview") { xp += 100; interviews++; }
+    }
+    let lvl = 0;
+    LEVELS.forEach(([min], i) => { if (xp >= min) lvl = i; });
+    return { xp, rated, noted, applied, interviews, lvl };
+  }
+  function renderHud() {
+    const g = progress();
+    const total = state.postings.size;
+    const [min, name] = LEVELS[g.lvl];
+    const next = LEVELS[g.lvl + 1];
+    $("#rank").textContent = `Level ${g.lvl + 1} · ${name}`;
+    const pct = next ? Math.round(((g.xp - min) / (next[0] - min)) * 100) : 100;
+    $("#xpfill").style.width = pct + "%";
+    $("#xpbar").setAttribute("aria-valuenow", String(pct));
+    $("#xptext").textContent = `${g.xp} XP`;
+    $("#xpnext").textContent = next ? `${next[0] - g.xp} XP to ${next[1]}` : "Max level";
+    $("#sRated").textContent = `${g.rated}/${total}`;
+    $("#sApplied").textContent = String(g.applied);
+    const m = state.meta || {};
+    $("#sRun").textContent = m.lastRun ? shortDate(m.lastRun) : "—";
+    $("#hunt").textContent = m.lastRun
+      ? `Last hunt ${m.lastRun}: ${m.researched ?? "?"} postings read, ${m.picked ?? "?"} put on the board, ${m.discarded ?? "?"} discarded. Next one: run /find-jobs in Claude Code.`
+      : "";
+    const badges = [
+      ["First verdict", "Rate a posting", g.rated >= 1],
+      ["Clean board", "Rate every posting", total > 0 && g.rated === total],
+      ["Thinking aloud", "Write 5 notes", g.noted >= 5],
+      ["Shot taken", "Apply somewhere", g.applied >= 1],
+      ["In the room", "Land an interview", g.interviews >= 1]
+    ];
+    $("#badges").replaceChildren(...badges.map(([t, how, on]) =>
+      el("span", { class: "badge" + (on ? " on" : ""), title: how }, el("i", { "aria-hidden": "true", text: on ? "★" : "☆" }), on ? t : `${t}: ${how.toLowerCase()}`)));
+  }
+  // Level-ups only celebrate his own actions, never data arriving on load.
+  function rewarded(fn) {
+    const before = progress().lvl;
+    fn();
+    const after = progress().lvl;
+    if (after > before) levelUp(LEVELS[after][1], after + 1);
+  }
+  const shortDate = (d) => { const t = new Date(d + "T12:00:00"); return isNaN(t) ? d : t.toLocaleDateString(undefined, { day: "numeric", month: "short" }); };
+
+  /* ---------- Board ---------- */
+  function renderTabs() {
+    const counts = { all: 0, rate: 0, high: 0, medium: 0, risky: 0, applied: 0 };
+    for (const p of state.postings.values()) {
+      const s = mine(p.id); counts.all++; counts[gradeOf(p)]++;
+      if (!s.score) counts.rate++;
+      if (isApplied(s)) counts.applied++;
+    }
+    $("#tabs").replaceChildren(...FILTERS.map(([k, name]) =>
+      el("button", { class: "tab", "aria-pressed": String(state.filter === k), onclick: () => { state.filter = k; try { localStorage.setItem("qb.filter", k); } catch (e) {} render(); } },
+        name, el("span", { class: "n", text: String(counts[k]) }))));
+  }
+
+  function row(p, i) {
+    const s = mine(p.id);
+    const g = gradeOf(p);
+    const fit = Math.max(0, Math.min(10, Math.round(Number(p.fit) || 0)));
+    const chips = [
+      p.example && el("span", { class: "chip ex", text: "EXAMPLE" }),
+      p.type && el("span", { class: "chip", text: str(p.type) }),
+      p.hours?.value && el("span", { class: "chip", text: str(p.hours.value) }),
+      p.remote && el("span", { class: "chip", text: str(p.remote) }),
+      p.drafted && el("span", { class: "chip ok", text: "Drafted" }),
+      s.status && s.status !== "" && el("span", { class: "chip ok", text: STATUSES.find(([k]) => k === s.status)?.[1] || s.status }),
+      arr(p.flags).length > 0 && el("span", { class: "chip warn", text: `${arr(p.flags).length} flag${arr(p.flags).length > 1 ? "s" : ""}` })
+    ];
+    return el("li", {},
+      el("button", { class: "row" + (s.score ? " done" : ""), style: `--i:${i}`, onclick: () => openCard(p.id), "aria-label": `${str(p.title)} at ${str(p.company)}, ${GRADES[g].name}, predicted fit ${fit} of 10${s.score ? `, your score ${s.score}` : ", not rated"}` },
+        el("i", { class: "gem " + g, "aria-hidden": "true" }),
+        el("div", { class: "rmain" },
+          el("div", { class: "rtitle" }, str(p.title), " ", el("span", { class: "rcompany", text: "· " + str(p.company) })),
+          el("div", { class: "chips" }, chips)),
+        el("div", { class: "power", "aria-hidden": "true" },
+          el("div", { class: "pips" }, Array.from({ length: 10 }, (_, k) => el("i", { class: k < fit ? "on" : "" }))),
+          el("span", { class: "label", text: `Fit ${fit}/10 · #${str(p.num || p.id)}` })),
+        el("span", { class: "myscore" + (s.score ? " set" : ""), "aria-hidden": "true", title: "Your score", text: s.score ? String(s.score) : "?" })));
+  }
+
+  function render() {
+    renderHud(); renderTabs();
+    const board = $("#board");
+    if (!state.loaded) return;
+    if (state.postings.size === 0) {
+      board.replaceChildren(el("div", { class: "panel empty" },
+        el("h2", { text: "The board is empty" }),
+        el("p", {}, "Run ", el("code", { text: "/find-jobs" }), " in Claude Code with Chrome open and LinkedIn logged in. Up to 20 new quests land here, best fit first.")));
+      return;
+    }
+    const list = sorted().filter(passes);
+    if (list.length === 0) {
+      board.replaceChildren(el("div", { class: "panel empty" }, el("h2", { text: state.filter === "rate" ? "Everything is rated" : "Nothing here" }),
+        el("p", { text: state.filter === "rate" ? "Nice work. Run /calibrate in Claude Code so the next hunt learns from your scores." : "Try another filter." })));
+      return;
+    }
+    let i = 0;
+    const groups = ["high", "medium", "risky"].map((g) => {
+      const items = list.filter((p) => gradeOf(p) === g);
+      if (!items.length) return null;
+      return el("section", { class: "group", "aria-label": GRADES[g].name },
+        el("div", { class: "group-head" }, el("i", { class: "gem " + g, "aria-hidden": "true" }), el("h2", { text: GRADES[g].name }), el("span", { class: "count", text: String(items.length) })),
+        el("ol", { class: "rows" }, items.map((p) => row(p, i++))));
+    });
+    board.replaceChildren(el("div", { style: "display:grid;gap:22px" }, groups));
+    if (!introDone) { introDone = true; board.classList.add("intro"); setTimeout(() => board.classList.remove("intro"), 1500); }
+    if (state.openId && $("#card").open) renderCard(state.openId);
+  }
+
+  /* ---------- Card ---------- */
+  const MARK = { yes: ["✓", "Matches"], partial: ["~", "Partly"], no: ["✕", "Doesn't match"] };
+  function checkList(items, textKey) {
+    return el("ul", { class: "checks" }, arr(items).map((it) => {
+      const o = typeof it === "string" ? { [textKey]: it } : it || {};
+      const m = MARK[o.match] || null;
+      return el("li", {},
+        el("span", { class: "mark " + (m ? o.match : "na"), title: m ? m[1] : "", "aria-label": m ? m[1] : "" , text: m ? m[0] : "•" }),
+        el("span", { text: str(o[textKey]) }));
+    }));
+  }
+  function tile(label, v) {
+    const o = v && typeof v === "object" ? v : { value: str(v) };
+    const src = o.source === "stated" ? "stated" : o.value ? "estimate" : "";
+    return el("div", { class: "tile" },
+      el("span", { class: "label", text: label }),
+      el("b", { text: str(o.value) || "Not stated" }),
+      src && el("span", { class: "tag " + src, text: src === "stated" ? "In the posting" : "Claude's estimate" }),
+      o.basis && el("small", { text: str(o.basis) }));
+  }
+
+  function renderCard(id) {
+    const p = state.postings.get(id);
+    const dlg = $("#card");
+    if (!p) { if (dlg.open) dlg.close(); return; }
+    const s = mine(id);
+    const g = gradeOf(p);
+    const fit = Math.round(Number(p.fit) || 0);
+    const prevNotes = $("#notes", dlg);
+    const typing = prevNotes && document.activeElement === prevNotes;
+    if (typing) { // don't rebuild under his cursor; refresh only the verdict state
+      dlg.querySelectorAll(".scorepad button").forEach((b, k) => { b.setAttribute("aria-pressed", String(s.score === k + 1)); b.classList.toggle("fill", !!s.score && k + 1 < s.score); });
+      return;
+    }
+    const scroll = dlg.scrollTop;
+    const num = str(p.num || p.id);
+    dlg.replaceChildren(
+      el("div", { class: "ribbon " + g },
+        el("span", {}, `${GRADES[g].name} · predicted ${fit}/10`),
+        el("button", { class: "close", "aria-label": "Close", onclick: () => dlg.close(), text: "×" })),
+      el("div", { class: "cbody" },
+        el("div", { class: "chead" },
+          el("span", { class: "label", text: `Quest #${num}${p.area ? " · " + str(p.area) : ""}${p.posted ? " · posted " + str(p.posted) : ""}` }),
+          el("h2", { id: "cardTitle", text: str(p.title) }),
+          el("div", { class: "rcompany", text: str(p.company) }),
+          el("div", { class: "chips" },
+            p.example && el("span", { class: "chip ex", text: "EXAMPLE, NOT A REAL POSTING" }),
+            [p.remote, p.type, p.language].filter(Boolean).map((t) => el("span", { class: "chip", text: str(t) })))),
+        el("div", { class: "tiles" }, tile("Pay", p.pay), tile("Weekly hours", p.hours)),
+        arr(p.requirements).length > 0 && el("div", { class: "sec" }, el("h3", { text: "Requirements" }), checkList(p.requirements, "text")),
+        arr(p.preferences).length > 0 && el("div", { class: "sec" }, el("h3", { text: "Your preferences" }), checkList(p.preferences, "text")),
+        arr(p.why).length > 0 && el("div", { class: "sec" }, el("h3", { text: "Why you fit" }),
+          el("ul", { class: "checks" }, arr(p.why).map((w) => {
+            const o = typeof w === "string" ? { text: w } : w || {};
+            return el("li", {}, el("span", { class: "mark yes", "aria-hidden": "true", text: "★" }),
+              el("span", {}, str(o.text), arr(o.evidence).length > 0 && el("span", { class: "ev", title: "Evidence bank IDs" }, arr(o.evidence).map((e) => el("span", { text: str(e) })))));
+          }))),
+        arr(p.flags).length > 0 && el("div", { class: "sec" }, el("h3", { text: "Watch out" }),
+          el("div", { class: "flags" }, arr(p.flags).map((f) => el("span", { class: "chip warn", text: str(f) })))),
+        el("div", { class: "verdict" },
+          el("span", { class: "label", text: "Your verdict" }),
+          el("div", { class: "scorepad", role: "group", "aria-label": "Your score from 1 to 10" },
+            Array.from({ length: 10 }, (_, k) => el("button", {
+              "aria-pressed": String(s.score === k + 1), class: s.score && k + 1 < s.score ? "fill" : "",
+              "aria-label": `Score ${k + 1}`, onclick: (e) => setScore(id, k + 1, e.currentTarget), text: String(k + 1) }))),
+          el("div", { class: "scale" }, el("span", { text: "1 · never show me this kind" }), el("span", { text: "10 · apply now" })),
+          el("label", { class: "label", for: "notes", text: "Why? (a phrase is enough)" }),
+          el("textarea", { id: "notes", placeholder: "e.g. love the SME advisory angle, but 30 h is too much", oninput: (e) => setNotes(id, e.target.value), onblur: () => flushNotes(id) }),
+          el("span", { class: "label", text: "Where it stands" }),
+          el("div", { class: "status", role: "group", "aria-label": "Application status" },
+            STATUSES.map(([k, name]) => el("button", { "aria-pressed": String((s.status || "") === k), onclick: (e) => setStatus(id, k, e.currentTarget), text: name }))),
+          el("span", { class: "saved", id: "saved", "aria-live": "polite" }))),
+      el("div", { class: "cfoot" },
+        el("div", { style: "display:grid;gap:4px;min-width:0" },
+          p.url && !p.example ? el("a", { class: "go", href: str(p.url), target: "_blank", rel: "noopener noreferrer" }, "Open the posting on LinkedIn ↗")
+                 : el("span", { class: "route", text: "Example card: no posting to open." }),
+          p.applyRoute && el("span", { class: "route", text: "Apply via " + str(p.applyRoute) })),
+        el("button", { class: "copy", onclick: (e) => copyCmd(`/draft ${num}`, e.currentTarget), text: `Copy  /draft ${num}` })));
+    $("#notes", dlg).value = str(s.notes);
+    dlg.scrollTop = scroll;
+  }
+  function openCard(id) {
+    state.openId = id;
+    renderCard(id);
+    const dlg = $("#card");
+    if (!dlg.open) { try { dlg.showModal(); } catch (e) { dlg.setAttribute("open", ""); } dlg.scrollTop = 0; }
+  }
+  $("#card").addEventListener("close", () => { if (state.openId) flushNotes(state.openId); state.openId = null; });
+  $("#card").addEventListener("click", (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
+  document.addEventListener("keydown", (e) => {
+    const dlg = $("#card");
+    if (!dlg.open || !state.openId || e.target.tagName === "TEXTAREA" || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (/^[0-9]$/.test(e.key)) { const n = e.key === "0" ? 10 : Number(e.key); setScore(state.openId, n, dlg.querySelectorAll(".scorepad button")[n - 1]); }
+  });
+
+  /* ---------- Writes (his scores only; postings are read-only here) ---------- */
+  function edit(id, patch) {
+    const cur = { ...(state.scores.get(id) || {}), ...(local.get(id) || {}), ...patch, updatedAt: new Date().toISOString() };
+    local.set(id, cur);
+    return cur;
+  }
+  function queueWrite(id) {
+    if (!db) { savedNote("Not saved: open this board on claude.ai while signed in."); return; }
+    let w = writers.get(id);
+    if (!w) { w = { busy: false, dirty: false }; writers.set(id, w); }
+    w.dirty = true;
+    if (!w.busy) flush(id, w);
+  }
+  async function flush(id, w) {
+    w.busy = true;
+    while (w.dirty) {
+      w.dirty = false;
+      const { score, notes, status, updatedAt } = { ...(state.scores.get(id) || {}), ...(local.get(id) || {}) };
+      const body = { updatedAt };
+      if (score) body.score = score;
+      if (notes) body.notes = notes;
+      if (status) body.status = status;
+      try { await db.doc("scores/" + id).set(body); savedNote("Saved"); }
+      catch (e) {
+        savedNote(e && e.code === "invalid_argument" ? "This board is read-only for you." : "Couldn't save. Check your connection and try again.");
+        break;
+      }
+    }
+    w.busy = false;
+  }
+  const savedNote = (t) => { const n = $("#saved"); if (n) n.textContent = t; };
+
+  function setScore(id, n, btn) {
+    const before = mine(id);
+    const cleared = before.score === n;
+    rewarded(() => edit(id, { score: cleared ? null : n }));
+    queueWrite(id);
+    if (!cleared && !before.score) { toast("+10 XP · verdict logged"); burst(btn); }
+    render();
+  }
+  let noteTimer = null, noteId = null;
+  function setNotes(id, v) {
+    const had = str(mine(id).notes).trim();
+    rewarded(() => edit(id, { notes: v }));
+    if (!had && v.trim()) toast("+5 XP · reasons noted");
+    clearTimeout(noteTimer); noteId = id;
+    noteTimer = setTimeout(() => { noteTimer = null; noteId = null; queueWrite(id); renderHud(); }, 900);
+  }
+  function flushNotes(id) { if (noteTimer) { clearTimeout(noteTimer); noteTimer = null; noteId = null; queueWrite(id); render(); } }
+  function setStatus(id, k, btn) {
+    const before = mine(id).status || "";
+    rewarded(() => edit(id, { status: k }));
+    queueWrite(id);
+    if (k === "applied" && !isApplied({ status: before })) { toast("+50 XP · application logged"); burst(btn); }
+    if (k === "interview" && before !== "interview") { toast("+100 XP · interview unlocked"); burst(btn); }
+    render();
+  }
+  async function copyCmd(text, btn) {
+    try { await navigator.clipboard.writeText(text); btn.textContent = "Copied ✓"; }
+    catch (e) { btn.textContent = text; const r = document.createRange(); r.selectNodeContents(btn); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); }
+    setTimeout(() => { btn.textContent = `Copy  ${text}`; }, 1600);
+  }
+
+  /* ---------- Juice ---------- */
+  function toast(t) {
+    document.querySelectorAll(".toast").forEach((n) => n.remove());
+    const n = el("div", { class: "toast", role: "status", text: t });
+    document.body.append(n);
+    setTimeout(() => n.remove(), 1700);
+  }
+  function burst(btn) {
+    if (reduced || !btn) return;
+    const r = btn.getBoundingClientRect();
+    const colors = ["var(--xp)", "var(--accent)", "var(--high)", "var(--mid)"];
+    for (let k = 0; k < 14; k++) {
+      const a = (Math.PI * 2 * k) / 14, d = 40 + Math.random() * 40;
+      const s = el("span", { class: "spark", style: `left:${r.left + r.width / 2}px;top:${r.top + r.height / 2}px;background:${colors[k % 4]};--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d}px` });
+      ($("#card").open ? $("#card") : document.body).append(s);
+      setTimeout(() => s.remove(), 750);
+    }
+  }
+  function levelUp(name, n) {
+    const host = el("div", { class: "levelup", role: "status" }, el("div", {}, `Level ${n}!`, el("small", { text: `You're now a ${name}` })));
+    ($("#card").open ? $("#card") : document.body).append(host);
+    setTimeout(() => host.remove(), 2300);
+  }
+
+  /* ---------- Data ---------- */
+  function fail(msg) {
+    state.loaded = true;
+    $("#board").replaceChildren(el("div", { class: "panel empty" }, el("h2", { text: "Can't load the board" }), el("p", { text: msg })));
+  }
+  async function start() {
+    render();
+    const use = window.claude && window.claude.use;
+    db = use ? await window.claude.use("db").catch(() => null) : null;
+    if (!db) return fail("Open this page on claude.ai while signed in: your postings and scores live there.");
+    let fresh = { postings: false, scores: false };
+    const timer = setTimeout(() => {
+      if (!state.loaded) fail("Your postings can't be reached yet. Check your connection; the board fills in once they load.");
+      else $("#hunt").textContent = "Showing saved data; it may be out of date.";
+    }, 10000);
+    const ready = () => { if (fresh.postings && fresh.scores) { clearTimeout(timer); } };
+    db.collection("postings").onSnapshot((snap) => {
+      state.postings = new Map(snap.docs.map((d) => [d.id, { id: d.id, ...d.data() }]));
+      state.loaded = true; if (!snap.metadata.fromCache) { fresh.postings = true; ready(); }
+      render();
+    }, (e) => fail("The postings stopped loading (" + e.code + "). Reload the page to try again."));
+    db.collection("scores").onSnapshot((snap) => {
+      state.scores = new Map(snap.docs.map((d) => [d.id, d.data()]));
+      // drop local copies the store now holds, but never one with a write or a note still pending
+      for (const id of [...local.keys()]) { const w = writers.get(id); if ((!w || (!w.busy && !w.dirty)) && id !== noteId) local.delete(id); }
+      if (!snap.metadata.fromCache) { fresh.scores = true; ready(); }
+      render();
+    }, () => {});
+    db.doc("meta/run").onSnapshot((d) => { state.meta = d.exists ? d.data() : null; renderHud(); }, () => {});
+  }
+  start();
+})();
+</script>
